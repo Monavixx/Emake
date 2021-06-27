@@ -2,6 +2,7 @@
 #include <iostream>
 #include "Args.h"
 #include <unordered_map>
+#include "TokenType.h"
 
 using namespace std;
 
@@ -13,11 +14,24 @@ public:
     {
     }
 
-    vector<string> Build() const noexcept
+    vector<string> Build() noexcept
     {
         vector<string> res;
 
         Parse(Lexer());
+        for(auto& [key, value] : lists)
+        {
+            cout << key << ":\n";
+            for(auto& item : value)
+            {
+                cout << item << ", ";
+            }
+            cout << '\n';
+        }
+        for(auto& [key, value] : values)
+        {
+            cout << key << ": " << value << '\n';
+        }
 
         return res;
     }
@@ -33,8 +47,7 @@ private:
         {
             if(IsOp(code[i]))
             {
-                //обрезание конца строки
-                
+                //remove blank characters at the end of a line
                 for(size_t j = temp.size() - 1; j >= 0; --j)
                 {
                     if(IsSpace(temp[j]))
@@ -47,7 +60,7 @@ private:
                     }
                 }
                 lexems.push_back(move(temp));
-                if(code[i] != ';')
+                if(code[i] != ';' && code[i] != ',')
                     lexems.emplace_back(1, code[i]);
                 isValue = false;
             }
@@ -66,10 +79,38 @@ private:
         }
         return lexems;
     }
-    void Parse(vector<string>&& lexems) const noexcept
+    void Parse(vector<string>&& lexems) noexcept
     {
-        copy(begin(lexems), end(lexems), ostream_iterator<string>{cout, ", "});
-        
+        for(size_t i = 0; i < lexems.size(); ++i)
+        {
+            using enum TokenType;
+            if(ToTokenType(lexems[i]) == NAME)
+            {
+                if(ToTokenType(lexems[i + 1]) == OPEN_BRACE)
+                {
+                    string key = move(lexems[i]);
+                    i += 2;
+                    while(ToTokenType(lexems[i]) != CLOSE_BRACE)
+                    {
+                        lists[key].push_back(move(lexems[i]));
+                        ++i;
+                    }
+                }
+                if(ToTokenType(lexems[i + 1]) == EQUAL)
+                {
+                    string key = move(lexems[i]);
+                    i += 2;
+                    values[key] = move(lexems[i]);
+                }
+            }
+        }
+    }
+    static TokenType ToTokenType(const string& str) noexcept
+    {
+        if(str == "{") return TokenType::OPEN_BRACE;
+        if(str == "}") return TokenType::CLOSE_BRACE;
+        if(str == "=") return TokenType::EQUAL;
+        return TokenType::NAME;
     }
     constexpr bool IsSpace(char c) const noexcept
     {
@@ -88,6 +129,5 @@ private:
     unsigned char sizeOps = 5;
     char ops[5]{'{', '}', '=', ',', ';'};
     unordered_map<string, vector<string>> lists;
-    unordered_map<string, string> strings;
-    unordered_map<string, bool> booleans;
+    unordered_map<string, string> values;
 };
