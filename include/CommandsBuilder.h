@@ -6,6 +6,13 @@
 
 using namespace std;
 
+template<class T>
+vector<T> operator+(vector<T> one, const vector<T>& two)
+{
+    one.assign(two.begin(), two.end());
+    return one;
+}
+
 class CommandsBuilder
 {
 public:
@@ -16,24 +23,35 @@ public:
 
     vector<string> Build() noexcept
     {
-        vector<string> res;
+        vector<string> commands;
+        string temp;
 
         Parse(Lexer());
-        for(auto& [key, value] : lists)
+
+        DefaultValues();
+
+        vector<string> objects;
+        
+        for(auto& item : lists["src"])
         {
-            cout << key << ":\n";
-            for(auto& item : value)
-            {
-                cout << item << ", ";
-            }
-            cout << '\n';
-        }
-        for(auto& [key, value] : values)
-        {
-            cout << key << ": " << value << '\n';
+            temp = values["compiler"];
+            temp += " -std=" + values["std"] + ((values["moduleSupport"] == "true") ? " -fmodules-ts" : "") +" -c " + item + " -o " + values["binary"] + "/";
+            string obj = string(item.begin(), item.begin() + item.find_last_of('.')) + ".o ";
+            obj = string(obj.begin() + obj.find_last_of('/') + 1, obj.end() - 1);
+            temp += obj + values["objArgs"];
+            objects.push_back(move(obj));
+            commands.push_back(move(temp));
         }
 
-        return res;
+        temp = values["compiler"];
+        for(auto& item : objects)
+        {
+            temp += " " + values["binary"] + "/" + item;
+        }
+        temp += " -o " + values["binary"] + "/" + values["buildname"];
+
+        commands.push_back(move(temp));
+        return commands;
     }
 
 private:
@@ -41,11 +59,11 @@ private:
     {
         vector<string> lexems;
         string temp;
-        bool isValue = false;
+        bool isValue = false, isOpenQuotes = false, isBackslash = false;
 
         for(size_t i = 0; i < code.size(); ++i)
         {
-            if(IsOp(code[i]))
+            if(IsOp(code[i]) && !isBackslash && !isOpenQuotes)
             {
                 //remove blank characters at the end of a line
                 for(size_t j = temp.size() - 1; j >= 0; --j)
@@ -63,6 +81,7 @@ private:
                 if(code[i] != ';' && code[i] != ',')
                     lexems.emplace_back(1, code[i]);
                 isValue = false;
+                isBackslash = false;
             }
             else if(IsSpace(code[i]))
             {
@@ -70,13 +89,26 @@ private:
                 {
                     temp.push_back(code[i]);
                 }
+                isBackslash = false;
+            }
+            else if(code[i] == '"' && !isBackslash)
+            {
+                isOpenQuotes = !isOpenQuotes;
+                isBackslash = false;
+            }
+            else if(code[i] == '\\' && !isBackslash && !isOpenQuotes)
+            {
+                isBackslash = true;
             }
             else
             {
                 isValue = true;
                 temp.push_back(code[i]);
+                isBackslash = false;
             }
         }
+        if(!temp.empty())
+            lexems.push_back(move(temp));
         return lexems;
     }
     void Parse(vector<string>&& lexems) noexcept
@@ -96,7 +128,7 @@ private:
                         ++i;
                     }
                 }
-                if(ToTokenType(lexems[i + 1]) == EQUAL)
+                else if(ToTokenType(lexems[i + 1]) == EQUAL)
                 {
                     string key = move(lexems[i]);
                     i += 2;
@@ -124,7 +156,32 @@ private:
         }
         return false;
     }
+    void DefaultValues()
+    {
+        if(!values.contains("compiler"))
+            values["compiler"] = "g++";
+        if(!values.contains("release"))
+            values["release"] = "false";
+        if(!values.contains("args"))
+            values["args"] = "";
+        if(!values.contains("buildname"))
+            values["buildname"] = "program";
+        if(!values.contains("binary"))
+            values["binary"] = "bin";
+        if(!values.contains("moduleSupport"))
+            values["moduleSupport"] = "false";
+        if(!values.contains("std"))
+            values["std"] = "c++20";
+        if(!values.contains("objArgs"))
+            values["objArgs"] = "";
 
+        if(!lists.contains("src"))
+            lists["src"] = {};
+        if(!lists.contains("include"))
+            lists["include"] = {};
+    }
+
+private:
     string code;
     unsigned char sizeOps = 5;
     char ops[5]{'{', '}', '=', ',', ';'};

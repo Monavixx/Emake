@@ -20,7 +20,11 @@ int main(int argc, char* argv[])
     code.resize(filesize);
     file.read(code.data(), filesize);
     CommandsBuilder cb{move(code)};
-    cb.Build();
+    for(auto& item: cb.Build())
+    {
+        system(item.c_str());
+        //cout << item << '\n';
+    }
     
     return 0;
 }

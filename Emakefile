@@ -1,25 +1,5 @@
 src
 {
-    main.cpp,
-    foo.cpp
+    test/main.cpp
 }
-include
-{
-    include/
-}
-std = c++20;
-moduleSupport = true;
-modules {
-    module.cc
-}
-release = false;
-args = -g;
-libFolders
-{
-    libs/
-}
-libs
-{
-    pthread
-}
-buildfile = program;
+binary = test/bin
