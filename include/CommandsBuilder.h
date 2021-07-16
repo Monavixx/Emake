@@ -31,15 +31,23 @@ public:
         DefaultValues();
 
         vector<string> objects;
+        string optimizeArgs = (values["release"] == "true") ? "-O3 -funroll-loops -fomit-frame-pointer -Ofast -std=c++2a -finline-functions -funswitch-loops -ffast-math -fforce-addr -pipe" : "";
         
+        string libsFlags;
+        for(auto& item : lists["libs"])
+        {
+            libsFlags += " -l" + item;
+        }
+
         for(auto& item : lists["src"])
         {
             temp = values["compiler"];
-            temp += " -std=" + values["std"] + ((values["moduleSupport"] == "true") ? " -fmodules-ts" : "") +" -c " + item + " -o " + values["binary"] + "/";
+            temp += " -std=" + values["std"] + ((values["moduleSupport"] == "true") ? " -fmodules-ts -fmodule-header" : "") +" -c " + item + " -o " + values["binary"] + "/";
             string obj = string(item.begin(), item.begin() + item.find_last_of('.')) + ".o ";
             obj = string(obj.begin() + obj.find_last_of('/') + 1, obj.end() - 1);
-            temp += obj + values["objArgs"];
+            temp += obj + " " + values["objArgs"] + " " + optimizeArgs;
             objects.push_back(move(obj));
+            temp += " -I" + values["include"] + " -L" + values["libsFolder"] + libsFlags;
             commands.push_back(move(temp));
         }
 
@@ -48,7 +56,7 @@ public:
         {
             temp += " " + values["binary"] + "/" + item;
         }
-        temp += " -o " + values["binary"] + "/" + values["buildname"];
+        temp += " -o " + values["binary"] + "/" + values["buildname"] + " " + values["args"] + libsFlags;
 
         commands.push_back(move(temp));
         return commands;
@@ -148,7 +156,7 @@ private:
     {
         return c == ' ' || c == '\n' || c == '\r' || c == '\t';
     }
-    bool IsOp(char c) const noexcept
+    static constexpr bool IsOp(char c) noexcept
     {
         for(unsigned char i = 0; i < sizeOps; ++i)
         {
@@ -174,17 +182,22 @@ private:
             values["std"] = "c++20";
         if(!values.contains("objArgs"))
             values["objArgs"] = "";
+        if(!values.contains("include"))
+            values["include"] = "./";
+        if(!values.contains("libsFolder"))
+            values["libsFolder"] = "./";
 
         if(!lists.contains("src"))
             lists["src"] = {};
-        if(!lists.contains("include"))
-            lists["include"] = {};
+        if(!lists.contains("libs"))
+            lists["libs"] = {};
     }
 
 private:
     string code;
-    unsigned char sizeOps = 5;
-    char ops[5]{'{', '}', '=', ',', ';'};
     unordered_map<string, vector<string>> lists;
     unordered_map<string, string> values;
+
+    constexpr static inline unsigned char sizeOps = 5;
+    constexpr static inline char ops[5]{'{', '}', '=', ',', ';'};
 };
